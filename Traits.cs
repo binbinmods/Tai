@@ -72,26 +72,31 @@ namespace Tai
 
             if (_trait == trait0)
             {
-                // Gain 1 evade at combat start 
+                // When you play a Shadow Spell, apply 2 Sanctify to everyone. When you play a Holy Spell, apply 2 Dark to everyone (once per turn).
+
                 LogDebug($"Handling Trait {traitId}: {traitName}");
-                _character.SetAuraTrait(_character, "evade", 1);
+                if (CanIncrementTraitActivations(traitId) && (_castedCard.HasCardType(Enums.CardType.Holy_Spell) || _castedCard.HasCardType(Enums.CardType.Shadow_Spell)))// && MatchManager.Instance.energyJustWastedByHero > 0)
+                {
+                    LogDebug($"Handling Trait {traitId}: {traitName}");
+
+                    if (_castedCard.HasCardType(Enums.CardType.Shadow_Spell))
+                    {
+                        ApplyAuraCurseToAll("sanctify", 2, AppliesTo.Global, sourceCharacter: _character, useCharacterMods: true);
+                    }
+                    if (_castedCard.HasCardType(Enums.CardType.Holy_Spell))
+                    {
+                        ApplyAuraCurseToAll("dark", 2, AppliesTo.Global, sourceCharacter: _character, useCharacterMods: true);
+                    }
+                    IncrementTraitActivations(traitId);
+                }
             }
 
 
             else if (_trait == trait2a)
             {
                 // trait2a
-                // Evasion +1. 
-                // Evasion on you stacks and increases All Damage by 1 per charge. 
-                // When you play a Defense card, gain 1 Energy and Draw 1. (2 times/turn)
+                // Double's Sanctify's effectiveness, but Sanctify explodes at 38 charges, dealing 2 Shadow Damage per charge. Dark explosions deal Holy Damage.
 
-                if (CanIncrementTraitActivations(traitId) && _castedCard.HasCardType(Enums.CardType.Defense))// && MatchManager.Instance.energyJustWastedByHero > 0)
-                {
-                    LogDebug($"Handling Trait {traitId}: {traitName}");
-                    _character?.ModifyEnergy(1);
-                    DrawCards(1);
-                    IncrementTraitActivations(traitId);
-                }
             }
 
 
@@ -99,7 +104,7 @@ namespace Tai
             else if (_trait == trait2b)
             {
                 // trait2b:
-                // Stealth on heroes increases All Damage by an additional 15% per charge and All Resistances by an additional 5% per charge.",
+                // Sanctify +2, Dark +2
                 LogDebug($"Handling Trait {traitId}: {traitName}");
 
             }
@@ -107,17 +112,17 @@ namespace Tai
             else if (_trait == trait4a)
             {
                 // trait 4a;
-                // Evasion on you can't be purged unless specified. 
-                // Stealth grants 25% additional damage per charge.",
-
+                // When dark or Sanctify explode, randomly apply energize and dark or inspire and sanctify to a random hero
                 LogDebug($"Handling Trait {traitId}: {traitName}");
             }
 
             else if (_trait == trait4b)
             {
                 // trait 4b:
-                // Heroes Only lose 75% stealth charges rounding down when acting in stealth.
+                // On hit, apply 2 Dark and 2 Sanctify. Dark and Sanctify explosions deal 30% more damage.
                 LogDebug($"Handling Trait {traitId}: {traitName}");
+                _target.SetAuraTrait(_character, "sanctify", 2);
+                _target.SetAuraTrait(_character, "dark", 2);
             }
 
         }
@@ -156,42 +161,48 @@ namespace Tai
             switch (_acId)
             {
                 // trait2a:
-                // Evasion on you stacks and increases All Damage by 1 per charge. 
+                // Double's Sanctify's effectiveness, but 
+                // Sanctify explodes at 38 charges, dealing 2 Shadow Damage per charge. 
+                // Dark explosions deal Holy Damage.
+
 
                 // trait2b:
-                // Stealth on heroes increases All Damage by an additional 15% per charge and All Resistances by an additional 5% per charge.",
+                // Sanctify +2, Dark +2
 
                 // trait 4a;
-                // Evasion on you can't be purged unless specified. 
-                // Stealth grants 25% additional damage per charge.",
+                // When dark or Sanctify explode, randomly apply energize and dark or inspire and sanctify to a random hero
 
                 // trait 4b:
-                // Heroes Only lose 75% stealth charges rounding down when acting in stealth.
+                // Dark and Sanctify explosions deal 30% more damage.
 
-                case "evasion":
+                case "sanctify":
                     traitOfInterest = trait2a;
-                    if (IfCharacterHas(characterOfInterest, CharacterHas.Trait, traitOfInterest, AppliesTo.ThisHero))
+                    if (IfCharacterHas(characterOfInterest, CharacterHas.Trait, traitOfInterest, AppliesTo.Global))
                     {
-                        __result.GainCharges = true;
-                        __result.AuraDamageType = Enums.DamageType.All;
-                        float multiplierAmount = 1.0f;  //characterOfInterest.HaveTrait(trait4a) ? 0.3f : 0.2f;
-                        __result.AuraDamageIncreasedPerStack = multiplierAmount;
-                        // __result.HealDoneTotal = Mathf.RoundToInt(multiplierAmount * characterOfInterest.GetAuraCharges("shield"));
+
+                        __result.HealAttackerPerStack *= 2;
+                        __result.ResistModifiedPercentagePerStack *= 2;
+                        __result.ResistModifiedPercentagePerStack2 *= 2;
+                        __result.ExplodeAtStacks = 38;
+                        __result.DamageWhenConsumedPerCharge = 2;
+                        __result.DamageTypeWhenConsumed = Enums.DamageType.Shadow;
                     }
-                    traitOfInterest = trait4a;
-                    if (IfCharacterHas(characterOfInterest, CharacterHas.Trait, traitOfInterest, AppliesTo.ThisHero))
+                    traitOfInterest = trait4b;
+                    if (IfCharacterHas(characterOfInterest, CharacterHas.Trait, traitOfInterest, AppliesTo.Global))
                     {
-                        __result.Removable = false;
+                        __result.DamageWhenConsumedPerCharge *= 1.3f;
                     }
                     break;
-                case "stealth":
-                    traitOfInterest = trait2b;
+                case "dark":
+                    traitOfInterest = trait2a;
                     if (IfCharacterHas(characterOfInterest, CharacterHas.Trait, traitOfInterest, AppliesTo.Heroes))
                     {
-                        __result.ResistModified = Enums.DamageType.All;
-                        __result.ResistModifiedPercentagePerStack += 5;
-                        __result.AuraDamageType = Enums.DamageType.All;
-                        __result.AuraDamageIncreasedPercentPerStack += 15;
+                        __result.DamageTypeWhenConsumed = Enums.DamageType.Holy;
+                    }
+                    traitOfInterest = trait4b;
+                    if (IfCharacterHas(characterOfInterest, CharacterHas.Trait, traitOfInterest, AppliesTo.Heroes))
+                    {
+                        __result.DamageWhenConsumedPerCharge *= 1.3f;
                     }
                     break;
             }
@@ -256,21 +267,45 @@ namespace Tai
             isDamagePreviewActive = false;
         }
 
-        // [HarmonyPostfix]
-        // [HarmonyPatch(typeof(Character), nameof(Character.SetEvent))]
-        // public static void SetEventPostfix(
-        //     Enums.EventActivation theEvent,
-        //     Character target = null,
-        //     int auxInt = 0,
-        //     string auxString = "")
-        // {
-        //     if (theEvent == Enums.EventActivation.BeginTurnCardsDealt && AtOManager.Instance.TeamHaveTrait(trait2b))
-        //     {
-        //         string cardToPlay = "tacticianexpectedprophecy";
-        //         PlayCardForFree(cardToPlay);
-        //     }
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(Character), nameof(Character.SetEvent))]
+        public static void SetEventPostfix(
+            Character __instance,
+            Enums.EventActivation theEvent,
+            Character target = null,
+            int auxInt = 0,
+            string auxString = "")
+        {
+            if (theEvent == Enums.EventActivation.AuraCurseSet && __instance.Alive && __instance != null && AtOManager.Instance.TeamHaveTrait(trait4a))
+            {
+                int nCharges = __instance.GetAuraCharges(auxString) + auxInt;
+                bool ACExplodes = nCharges >= GetAuraCurseData(auxString).ExplodeAtStacks;
+                if (ACExplodes)
+                {
+                    LogDebug($"{auxString} explodes on {__instance.Id} with {__instance.GetAuraCharges(auxString)} + {auxInt} charges.");
+                    // When dark or Sanctify explode, randomly apply energize and dark or inspire and sanctify to a random hero
+                    Hero[] teamHeroes = MatchManager.Instance.GetTeamHero();
+                    Character randomCharacter = GetRandomCharacter(teamHeroes);
 
-        // }
+                    if (MatchManager.Instance.GetRandomIntRange(0, 2) == 0)
+                    {
+                        // Apply energize and dark
+                        randomCharacter.SetAuraTrait(__instance, "energize", 1);
+                        randomCharacter.SetAuraTrait(__instance, "dark", 5);
+                    }
+                    else
+                    {
+                        // Apply inspire and sanctify
+                        randomCharacter.SetAuraTrait(__instance, "inspire", 1);
+                        randomCharacter.SetAuraTrait(__instance, "sanctify", 5);
+                    }
+
+
+                }
+
+            }
+
+        }
 
 
 
